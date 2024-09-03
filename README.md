@@ -1,10 +1,10 @@
-# Open AI GPTcode-reviwer
+# Open AI GPTcode-reviewer
 
 [![Known Vulnerabilities](https://snyk.io/test/github/PierreGode/GPTcode-reviwer/badge.svg)](https://snyk.io/test/github/PierreGode/GPTcode-reviwer) [![GitHub issues](https://img.shields.io/github/issues/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/issues) [![GitHub pull requests](https://img.shields.io/github/issues-pr/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/pulls) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/PierreGode/GPTcode-reviwer/blob/main/LICENSE)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J2EARPK)
 
-Open AI GPTcode-reviwer is a GitHub Action that leverages OpenAI's GPT-4o-mini API to provide intelligent feedback and suggestions on
+Open AI GPTcode-reviewer is a GitHub Action that leverages OpenAI's GPT-4o-mini API to provide intelligent feedback and suggestions on
 your pull requests. This powerful tool helps improve code quality and saves developers time by automating the code
 review process.
 
@@ -34,7 +34,7 @@ review process.
 3. Create a `.github/workflows/main.yml` file in your repository and add the following content:
 
 ```yaml
-name: GPTcode-reviwer
+name: GPTcode-reviewer
 
 on:
   pull_request:
@@ -49,8 +49,8 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: GPTcode-reviwer
-        uses: your-username/ai-code-reviewer@main
+      - name: GPTcode-reviewer
+        uses: your-username/GPTcode-reviewer@main
         with:
           GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -69,14 +69,13 @@ jobs:
 
 ## How It Works
 
-The AI Code Reviewer GitHub Action retrieves the pull request diff, filters out excluded files, and sends code chunks to
+The GPTcode-reviewer GitHub Action retrieves the pull request diff, filters out excluded files, and sends code chunks to
 the OpenAI API. It then generates review comments based on the AI's response and adds them to the pull request.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests to improve the AI Code Reviewer GitHub
+Contributions are welcome! Please feel free to submit issues or pull requests to improve the GPTcode-reviewer GitHub
 Action.
 
 ## License
-This is a re-builded version from the abandoned ai-codereviewer
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
