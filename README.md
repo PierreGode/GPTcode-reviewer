@@ -34,7 +34,7 @@ review process.
 3. Create a `.github/workflows/main.yml` file in your repository and add the following content:
 
 ```yaml
-name: AI Code Reviewer
+name: GPTcode-reviwer
 
 on:
   pull_request:
