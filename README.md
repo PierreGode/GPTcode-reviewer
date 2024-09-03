@@ -4,7 +4,7 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J2EARPK)
 
-AI Code Reviewer is a GitHub Action that leverages OpenAI's GPT-4o-mini API to provide intelligent feedback and suggestions on
+Open AI GPTcode-reviwer is a GitHub Action that leverages OpenAI's GPT-4o-mini API to provide intelligent feedback and suggestions on
 your pull requests. This powerful tool helps improve code quality and saves developers time by automating the code
 review process.
 
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: AI Code Reviewer
         uses: your-username/ai-code-reviewer@main
