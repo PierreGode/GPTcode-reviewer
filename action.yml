@@ -28,4 +28,4 @@ runs:
   main: "dist/index.js"
 branding:
   icon: "aperture"
-  color: "green"
+  color: "gray-dark"
