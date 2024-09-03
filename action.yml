@@ -1,4 +1,4 @@
-name: "GPTcode reviwe Action"
+name: "GPT code review Action"
 description: "Perform code reviews and comment on diffs using OpenAI API."
 inputs:
   GITHUB_TOKEN:
