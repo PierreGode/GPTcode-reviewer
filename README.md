@@ -49,10 +49,10 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: AI Code Reviewer
+      - name: GPTcode-reviwer
         uses: your-username/ai-code-reviewer@main
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_API_MODEL: "gpt-4o-mini" # Optional: defaults to "gpt-4o-mini"
           REVIEW_MAX_COMMENTS: 5 # Optional: defaults to 10
