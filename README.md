@@ -1,4 +1,4 @@
-# Open AI Code Reviewer
+# Open AI GPTcode-reviwer
 
 [![Known Vulnerabilities](https://snyk.io/test/github/PierreGode/GPTcode-reviwer/badge.svg)](https://snyk.io/test/github/PierreGode/GPTcode-reviwer) [![GitHub issues](https://img.shields.io/github/issues/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/issues) [![GitHub pull requests](https://img.shields.io/github/issues-pr/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/pulls) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/PierreGode/GPTcode-reviwer/blob/main/LICENSE)
 
