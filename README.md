@@ -15,6 +15,14 @@ review process.
 - Filters out files that match specified exclude patterns.
 - Easy to set up and integrate into your GitHub workflow.
 
+
+## GPT-4o mini
+- GPT-4o mini is our most cost-efficient small model that’s smarter and cheaper than GPT-3.5 Turbo, and has vision capabilities. The model has 128K context and an October 2023 knowledge cutoff.
+- gpt-4o-mini
+- $0.150 / 1M input tokens
+- $0.600 / 1M output tokens
+
+
 ## Setup
 
 1. To use this GitHub Action, you need an OpenAI API key. If you don't have one, sign up for an API key
