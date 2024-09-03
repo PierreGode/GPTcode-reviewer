@@ -1,0 +1,31 @@
+name: "GPTcode reviwe Action"
+description: "Perform code reviews and comment on diffs using OpenAI API."
+inputs:
+  GITHUB_TOKEN:
+    description: "GitHub token to interact with the repository."
+    required: true
+  OPENAI_API_KEY:
+    description: "OpenAI API key for GPT."
+    required: true
+  OPENAI_API_MODEL:
+    description: "OpenAI API model."
+    required: false
+    default: "gpt-4o-mini"
+  REVIEW_MAX_COMMENTS:
+    description: "Maximum number of comments to include in a review (per diff)."
+    required: false
+    default: 3
+  REVIEW_PROJECT_CONTEXT:
+    description: "Project context to include in a review. E.g. Typescript with NestJS + TypeORM"
+    required: false
+    default: ""
+  exclude:
+    description: "Glob patterns to exclude files from the diff analysis"
+    required: false
+    default: ""
+runs:
+  using: "node16"
+  main: "dist/index.js"
+branding:
+  icon: "aperture"
+  color: "green"

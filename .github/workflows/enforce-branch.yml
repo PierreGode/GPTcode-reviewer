@@ -1,0 +1,18 @@
+name: Enforce Main Branch for Release
+
+on:
+  pull_request:
+    branches:
+      - release
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR is from main branch
+        run: |
+          if [ "${{ github.head_ref }}" != "main" ]; then
+            echo "::error::Pull requests to the release branch must originate from the main branch. Current branch is '${{ github.head_ref }}'."
+            exit 1
+          fi
+
