@@ -8,6 +8,10 @@ Open AI GPTcode-reviewer is a GitHub Action that leverages OpenAI's GPT-4o-mini 
 your pull requests. This powerful tool helps improve code quality and saves developers time by automating the code
 review process.
 
+![image](https://github.com/user-attachments/assets/00a3a9f2-134a-4906-9392-d77916c1174d)
+
+![image](https://github.com/user-attachments/assets/2beff50c-15fc-4beb-8f2c-1e25f01ce4ee)
+
 ## Features
 
 - Reviews pull requests using OpenAI's GPT-4o API.
