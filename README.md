@@ -1,6 +1,6 @@
 # Open AI GPTcode-reviewer
 
-[![Known Vulnerabilities](https://snyk.io/test/github/PierreGode/GPTcode-reviwer/badge.svg)](https://snyk.io/test/github/PierreGode/GPTcode-reviwer) [![GitHub issues](https://img.shields.io/github/issues/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/issues) [![GitHub pull requests](https://img.shields.io/github/issues-pr/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/pulls) ![Visitor Count](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://github.com/PierreGode/GPTcode-reviewer&title=Visitors) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/PierreGode/GPTcode-reviwer/blob/main/LICENSE)
+[![Known Vulnerabilities](https://snyk.io/test/github/PierreGode/GPTcode-reviwer/badge.svg)](https://snyk.io/test/github/PierreGode/GPTcode-reviwer) [![GitHub issues](https://img.shields.io/github/issues/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/issues) [![GitHub pull requests](https://img.shields.io/github/issues-pr/PierreGode/GPTcode-reviwer)](https://github.com/PierreGode/GPTcode-reviwer/pulls) ![Visitor Count](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://github.com/PierreGode/GPTcode-reviewer&title=Visitors) ![GitHub Workflow Status](https://github.com/PierreGode/GPTcode-reviewer/actions/workflows/code_review.yml/badge.svg) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/PierreGode/GPTcode-reviwer/blob/main/LICENSE)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J2EARPK)
 
@@ -75,6 +75,12 @@ jobs:
 
 The GPTcode-reviewer GitHub Action retrieves the pull request diff, filters out excluded files, and sends code chunks to
 the OpenAI API. It then generates review comments based on the AI's response and adds them to the pull request.
+
+## Add your badge to readme
+![GitHub Workflow Status](https://github.com/PierreGode/GPTcode-reviewer/actions/workflows/code_review.yml/badge.svg)
+```
+![GitHub Workflow Status](https://github.com/YOUR-GITHUB/YOUR-REVIWED-REPOSITORY/actions/workflows/code_review.yml/badge.svg)
+```
 
 ## Contributing
 
