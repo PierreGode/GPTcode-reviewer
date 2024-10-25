@@ -81,19 +81,22 @@ async function analyzeCode(
 }
 
 function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
-  const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide response in JSON format: [{"file": <file name>,  "lineNumber":  <line_number>, "reviewComment": "<review comment>"}]
-- Avoid positive comments, compliments, or naming advice.
-- Only suggest improvements if necessary. Otherwise, return an empty array.
+const problemOutline = `Your task is to review pull requests (PR). Instructions:
+- Provide response in JSON format: [{"file": <file name>, "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
+- Focus on identifying code issues, such as:
+  - Syntax errors, undefined variables, or incorrect usage of functions or methods.
+  - Potential bugs, edge cases, or code that may cause runtime errors.
+  - Code quality improvements, such as simplifying complex expressions or fixing inefficient code.
+  - Readability improvements that enhance code structure (but avoid suggesting naming changes).
+- Math and logic errors should be identified only if they could cause code issues (e.g., runtime failures or incorrect behavior).
 - Limit to ${REVIEW_MAX_COMMENTS} comments.
-- Use GitHub Markdown.
-- Look for math or logic errors.
-${REVIEW_PROJECT_CONTEXT ? `- Context: ${REVIEW_PROJECT_CONTEXT}` : ""}
-- DO NOT suggest adding comments in code.
-- Evaluate the entire PR diff.
+- Write comments in GitHub Markdown format.
+- IMPORTANT: Avoid adding inline comments within the code itself or suggesting comment additions.
+- Evaluate the entire PR diff holistically before providing feedback.
 
-Title: ${prDetails.title}
-Description:
+Pull request title: ${prDetails.title}
+Pull request description:
+
 ---
 ${prDetails.description}
 ---
