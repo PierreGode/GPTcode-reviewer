@@ -1,29 +1,67 @@
-import { writeFileSync } from "fs"; // Add writeFileSync to save logs
+// Function to generate a PR summary
+function generatePRSummary(
+  prDetails: PRDetails,
+  changedFiles: File[],
+  comments: Array<GithubComment>
+): string {
+  const totalFilesChanged = changedFiles.length;
+  const totalLinesChanged = changedFiles.reduce(
+    (sum, file) =>
+      sum + file.chunks.reduce((lineSum, chunk) => lineSum + chunk.changes.length, 0),
+    0
+  );
+  const totalComments = comments.length;
 
-// Function to log PR details and comments to a file
+  const criticalComments = comments.filter((comment) =>
+    /(security|vulnerability|error|critical)/i.test(comment.body)
+  );
+
+  return `
+# PR Summary
+
+- **Title**: ${prDetails.title}
+- **Description**: ${prDetails.description}
+- **Repository**: ${prDetails.owner}/${prDetails.repo}
+- **PR Number**: ${prDetails.pull_number}
+
+## Changes Overview
+- **Files Changed**: ${totalFilesChanged}
+- **Lines Changed**: ${totalLinesChanged}
+- **Total AI Comments**: ${totalComments}
+- **Critical Issues Identified**: ${criticalComments.length}
+
+${
+  criticalComments.length > 0
+    ? `## Critical Findings
+${criticalComments
+  .map(
+    (comment) => `
+- **File**: ${comment.path}
+  - **Line**: ${comment.line}
+  - **Issue**: ${comment.body}
+`
+  )
+  .join("\n")}
+`
+    : "No critical issues identified."
+}
+  `;
+}
+
+// Enhanced logging function to include summary
 function logPRDocumentation(
   prDetails: PRDetails,
   changedFiles: File[],
   comments: Array<GithubComment>
 ) {
   const logFileName = `PR_${prDetails.pull_number}_log.md`;
+  const summary = generatePRSummary(prDetails, changedFiles, comments);
   const logContent = `
-# Pull Request Documentation
-
-## PR Metadata
-- **Title**: ${prDetails.title}
-- **Description**: ${prDetails.description}
-- **Repository**: ${prDetails.owner}/${prDetails.repo}
-- **PR Number**: ${prDetails.pull_number}
+${summary}
 
 ---
 
-## Changed Files
-${changedFiles.map((file) => `- ${file.to}`).join("\n")}
-
----
-
-## AI Comments
+## Detailed AI Comments
 ${comments
   .map(
     (comment) => `
@@ -39,50 +77,22 @@ ${comments
   console.log(`Log saved to ${logFileName}`);
 }
 
-// Enhanced Prompt for Security Vulnerability Checks
-function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
-  const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in the following JSON format:  [{"file": <file name>,  "lineNumber":  <line_number>, "reviewComment": "<review comment>"}]
-- DO NOT give positive comments or compliments.
-- DO NOT give advice on renaming variable names or writing more descriptive variables.
-- Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
-- Provide at most ${REVIEW_MAX_COMMENTS} comments. It's up to you how to decide which comments to include.
-- Write the comment in GitHub Markdown format.
-- Check for math or logic errors in code.
-- **Check for common security vulnerabilities** (e.g., SQL Injection, XSS, hardcoded secrets, insecure deserialization, etc.).
-- Provide feedback on how to fix any vulnerabilities found.
-- Use the given description only for the overall context and only comment on the code.
-${
-  REVIEW_PROJECT_CONTEXT
-    ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}`
-    : ""
-}
-- IMPORTANT: NEVER suggest adding comments to the code.
-- IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
-
-Pull request title: ${prDetails.title}
-Pull request description:
-
----
-${prDetails.description}
----
-
-TAKE A DEEP BREATH AND WORK ON THIS PROBLEM STEP-BY-STEP.
-`;
-
-  const diffChunksPrompt = new Array();
-
-  for (const file of changedFiles) {
-    if (file.to === "/dev/null") continue; // Ignore deleted files
-    for (const chunk of file.chunks) {
-      diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
-    }
-  }
-
-  return `${problemOutline}\n ${diffChunksPrompt.join("\n")}`;
+// Post summary as a comment on the PR
+async function postPRSummary(
+  owner: string,
+  repo: string,
+  pull_number: number,
+  summary: string
+): Promise<void> {
+  await octokit.issues.createComment({
+    owner,
+    repo,
+    issue_number: pull_number,
+    body: summary,
+  });
 }
 
-// Update main to include logging and security checks
+// Update main to include summary generation and posting
 async function main() {
   const prDetails = await getPRDetails();
   let diff: string | null;
@@ -136,8 +146,12 @@ async function main() {
 
   const comments = await analyzeCode(filteredDiff, prDetails);
 
-  // Save PR Documentation
+  // Save PR Documentation with Summary
   logPRDocumentation(prDetails, filteredDiff, comments);
+
+  // Post PR Summary as a Comment
+  const summary = generatePRSummary(prDetails, filteredDiff, comments);
+  await postPRSummary(prDetails.owner, prDetails.repo, prDetails.pull_number, summary);
 
   if (comments.length > 0) {
     await createReviewComment(
