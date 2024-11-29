@@ -1,109 +1,57 @@
-import { readFileSync } from "fs";
-import * as core from "@actions/core";
-import { Configuration, OpenAIApi } from "openai";
-import { Octokit } from "@octokit/rest";
-import parseDiff, { Chunk, File } from "parse-diff";
-import minimatch from "minimatch";
+import { writeFileSync } from "fs"; // Add writeFileSync to save logs
 
-const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
-const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
-const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
-const REVIEW_MAX_COMMENTS: string = core.getInput("REVIEW_MAX_COMMENTS");
-const REVIEW_PROJECT_CONTEXT: string = core.getInput("REVIEW_PROJECT_CONTEXT");
-
-const RESPONSE_TOKENS = 1024;
-
-const octokit = new Octokit({ auth: GITHUB_TOKEN });
-
-const configuration = new Configuration({
-  apiKey: OPENAI_API_KEY,
-});
-
-const openai = new OpenAIApi(configuration);
-
-interface PRDetails {
-  owner: string;
-  repo: string;
-  pull_number: number;
-  title: string;
-  description: string;
-}
-
-interface AICommentResponse {
-  file: string;
-  lineNumber: string;
-  reviewComment: string;
-}
-
-interface GithubComment {
-  body: string;
-  path: string;
-  line: number;
-}
-
-async function getPRDetails(): Promise<PRDetails> {
-  const { repository, number } = JSON.parse(
-    readFileSync(process.env.GITHUB_EVENT_PATH || "", "utf8")
-  );
-  const prResponse = await octokit.pulls.get({
-    owner: repository.owner.login,
-    repo: repository.name,
-    pull_number: number,
-  });
-  return {
-    owner: repository.owner.login,
-    repo: repository.name,
-    pull_number: number,
-    title: prResponse.data.title ?? "",
-    description: prResponse.data.body ?? "",
-  };
-}
-
-async function getDiff(
-  owner: string,
-  repo: string,
-  pull_number: number
-): Promise<string | null> {
-  const response = await octokit.pulls.get({
-    owner,
-    repo,
-    pull_number,
-    mediaType: { format: "diff" },
-  });
-  // @ts-expect-error - response.data is a string
-  return response.data;
-}
-
-async function analyzeCode(
+// Function to log PR details and comments to a file
+function logPRDocumentation(
+  prDetails: PRDetails,
   changedFiles: File[],
-  prDetails: PRDetails
-): Promise<Array<GithubComment>> {
-  const prompt = createPrompt(changedFiles, prDetails);
-  const aiResponse = await getAIResponse(prompt);
+  comments: Array<GithubComment>
+) {
+  const logFileName = `PR_${prDetails.pull_number}_log.md`;
+  const logContent = `
+# Pull Request Documentation
 
-  const comments: Array<GithubComment> = [];
+## PR Metadata
+- **Title**: ${prDetails.title}
+- **Description**: ${prDetails.description}
+- **Repository**: ${prDetails.owner}/${prDetails.repo}
+- **PR Number**: ${prDetails.pull_number}
 
-  if (aiResponse) {
-    const newComments = createComments(changedFiles, aiResponse);
+---
 
-    if (newComments) {
-      comments.push(...newComments);
-    }
-  }
+## Changed Files
+${changedFiles.map((file) => `- ${file.to}`).join("\n")}
 
-  return comments;
+---
+
+## AI Comments
+${comments
+  .map(
+    (comment) => `
+### File: ${comment.path}
+- **Line**: ${comment.line}
+- **Comment**: ${comment.body}
+`
+  )
+  .join("\n")}
+  `;
+
+  writeFileSync(logFileName, logContent, "utf8");
+  console.log(`Log saved to ${logFileName}`);
 }
 
+// Enhanced Prompt for Security Vulnerability Checks
 function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
   const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in following JSON format:  [{"file": <file name>,  "lineNumber":  <line_number>, "reviewComment": "<review comment>"}]
+- Provide the response in the following JSON format:  [{"file": <file name>,  "lineNumber":  <line_number>, "reviewComment": "<review comment>"}]
 - DO NOT give positive comments or compliments.
 - DO NOT give advice on renaming variable names or writing more descriptive variables.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
 - Provide at most ${REVIEW_MAX_COMMENTS} comments. It's up to you how to decide which comments to include.
 - Write the comment in GitHub Markdown format.
 - Check for math or logic errors in code.
-- Use the given description only for the overall context and only comment the code.
+- **Check for common security vulnerabilities** (e.g., SQL Injection, XSS, hardcoded secrets, insecure deserialization, etc.).
+- Provide feedback on how to fix any vulnerabilities found.
+- Use the given description only for the overall context and only comment on the code.
 ${
   REVIEW_PROJECT_CONTEXT
     ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}`
@@ -119,7 +67,7 @@ Pull request description:
 ${prDetails.description}
 ---
 
-TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
+TAKE A DEEP BREATH AND WORK ON THIS PROBLEM STEP-BY-STEP.
 `;
 
   const diffChunksPrompt = new Array();
@@ -134,94 +82,7 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
   return `${problemOutline}\n ${diffChunksPrompt.join("\n")}`;
 }
 
-function createPromptForDiffChunk(file: File, chunk: Chunk): string {
-  return `\n
-  Review the following code diff in the file "${file.to}". Git diff to review:
-
-  \`\`\`diff
-  ${chunk.content}
-  ${chunk.changes
-    // @ts-expect-error - ln and ln2 exists where needed
-    .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-    .join("\n")}
-  \`\`\`
-  `;
-}
-
-async function getAIResponse(
-  prompt: string
-): Promise<Array<AICommentResponse> | null> {
-  const queryConfig = {
-    model: OPENAI_API_MODEL,
-    temperature: 0.2,
-    max_tokens: RESPONSE_TOKENS,
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
-  };
-
-  try {
-    const response = await openai.createChatCompletion({
-      ...queryConfig,
-      messages: [
-        {
-          role: "system",
-          content: prompt,
-        },
-      ],
-    });
-
-    const res = response.data.choices[0].message?.content?.trim() || "[]";
-    return JSON.parse(res);
-  } catch (error: any) {
-    console.error("Error Message:", error?.message || error);
-
-    if (error?.response) {
-      console.error("Response Data:", error.response.data);
-      console.error("Response Status:", error.response.status);
-      console.error("Response Headers:", error.response.headers);
-    }
-
-    if (error?.config) {
-      console.error("Config:", error.config);
-    }
-
-    return null;
-  }
-}
-
-function createComments(
-  changedFiles: File[],
-  aiResponses: Array<AICommentResponse>
-): Array<GithubComment> {
-  return aiResponses
-    .flatMap((aiResponse) => {
-      const file = changedFiles.find((file) => file.to === aiResponse.file);
-
-      return {
-        body: aiResponse.reviewComment,
-        path: file?.to ?? "",
-        line: Number(aiResponse.lineNumber),
-      };
-    })
-    .filter((comments) => comments.path !== "");
-}
-
-async function createReviewComment(
-  owner: string,
-  repo: string,
-  pull_number: number,
-  comments: Array<GithubComment>
-): Promise<void> {
-  await octokit.pulls.createReview({
-    owner,
-    repo,
-    pull_number,
-    comments,
-    event: "COMMENT",
-  });
-}
-
+// Update main to include logging and security checks
 async function main() {
   const prDetails = await getPRDetails();
   let diff: string | null;
@@ -274,6 +135,10 @@ async function main() {
   });
 
   const comments = await analyzeCode(filteredDiff, prDetails);
+
+  // Save PR Documentation
+  logPRDocumentation(prDetails, filteredDiff, comments);
+
   if (comments.length > 0) {
     await createReviewComment(
       prDetails.owner,
