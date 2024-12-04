@@ -41,6 +41,53 @@ interface GithubComment {
   line: number;
 }
 
+// Generate a PR summary
+function generatePRSummary(
+  prDetails: PRDetails,
+  changedFiles: File[],
+  comments: GithubComment[]
+): string {
+  const totalFilesChanged = changedFiles.length;
+  const totalComments = comments.length;
+
+  return `
+# PR Summary
+
+- **Title**: ${prDetails.title}
+- **Description**: ${prDetails.description}
+- **Files Changed**: ${totalFilesChanged}
+- **AI Comments**: ${totalComments}
+
+${
+    totalComments > 0
+      ? "Detailed comments have been posted in the pull request."
+      : "No issues were found in the code changes."
+  }
+`;
+}
+
+// Post summary as a comment on the PR
+async function postPRSummary(
+  owner: string,
+  repo: string,
+  pull_number: number,
+  summary: string
+): Promise<void> {
+  try {
+    console.log("Posting PR summary...");
+    await octokit.issues.createComment({
+      owner,
+      repo,
+      issue_number: pull_number,
+      body: summary,
+    });
+    console.log("PR summary posted successfully.");
+  } catch (error) {
+    console.error("Error posting PR summary:", error);
+    throw error;
+  }
+}
+
 async function getPRDetails(): Promise<PRDetails> {
   const { repository, number } = JSON.parse(
     readFileSync(process.env.GITHUB_EVENT_PATH || "", "utf8")
@@ -50,6 +97,9 @@ async function getPRDetails(): Promise<PRDetails> {
     repo: repository.name,
     pull_number: number,
   });
+
+  console.log("Fetched PR details:", prResponse.data);
+
   return {
     owner: repository.owner.login,
     repo: repository.name,
@@ -70,24 +120,8 @@ async function getDiff(
     pull_number,
     mediaType: { format: "diff" },
   });
+  console.log("Fetched diff data.");
   return response.data as string;
-}
-
-function generatePRSummary(
-  prDetails: PRDetails,
-  changedFiles: File[],
-  comments: GithubComment[]
-): string {
-  const totalFiles = changedFiles.length;
-  const totalComments = comments.length;
-  return `
-# PR Summary
-- **Title**: ${prDetails.title}
-- **Description**: ${prDetails.description}
-- **Files Changed**: ${totalFiles}
-- **AI Comments**: ${totalComments}
-${totalComments > 0 ? "Detailed comments posted in the PR." : "No comments required."}
-`;
 }
 
 async function analyzeCode(
@@ -100,37 +134,48 @@ async function analyzeCode(
   return createComments(changedFiles, aiResponse);
 }
 
+function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
+  const basePrompt = `
+Your task is to review the following pull request (PR):
+Title: ${prDetails.title}
+Description: ${prDetails.description}
+
+Provide comments in the following JSON format:
+[{"file": "<file_name>", "lineNumber": <line_number>, "reviewComment": "<review_comment>"}]
+
+Focus on logical, critical, or security-related improvements. Return an empty array if no comments are necessary.
+`;
+
+  const diffChunksPrompt = changedFiles
+    .map((file) =>
+      file.chunks.map((chunk) => {
+        return `\nFile: ${file.to}\nChunk:\n${chunk.content}\n${chunk.changes
+          .map((c) => c.content)
+          .join("\n")}`;
+      })
+    )
+    .flat()
+    .join("\n");
+
+  return `${basePrompt}\n\n${diffChunksPrompt}`;
+}
+
 async function getAIResponse(prompt: string): Promise<AICommentResponse[] | null> {
   try {
+    console.log("Sending prompt to OpenAI...");
     const response = await openai.createChatCompletion({
       model: OPENAI_API_MODEL,
       messages: [{ role: "system", content: prompt }],
       max_tokens: RESPONSE_TOKENS,
     });
-    return JSON.parse(response.data.choices[0].message?.content || "[]");
+
+    const res = response.data.choices[0].message?.content?.trim() || "[]";
+    console.log("AI response received:", res);
+    return JSON.parse(res);
   } catch (error) {
-    console.error("OpenAI Error:", error);
+    console.error("Error generating AI response:", error);
     return null;
   }
-}
-
-function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
-  return `Your task is to review the following PR titled "${prDetails.title}".
-Description:
-${prDetails.description}
-
-Files and changes:
-${changedFiles
-  .map(
-    (file) =>
-      `File: ${file.to}\nChanges:\n${file.chunks.map(
-        (chunk) => `\n${chunk.content}\n${chunk.changes.map((c) => c.content).join("\n")}`
-      )}`
-  )
-  .join("\n")}
-- Focus on logical or critical improvements only.
-- Output comments in JSON format as described.
-`;
 }
 
 function createComments(
@@ -139,35 +184,33 @@ function createComments(
 ): GithubComment[] {
   return aiResponses.map((response) => {
     const file = changedFiles.find((f) => f.to === response.file);
-    return { body: response.reviewComment, path: file?.to ?? "", line: +response.lineNumber };
-  });
-}
-
-async function postPRSummary(
-  owner: string,
-  repo: string,
-  pull_number: number,
-  summary: string
-): Promise<void> {
-  await octokit.issues.createComment({
-    owner,
-    repo,
-    issue_number: pull_number,
-    body: summary,
+    return {
+      body: response.reviewComment,
+      path: file?.to ?? "",
+      line: parseInt(response.lineNumber, 10),
+    };
   });
 }
 
 async function main() {
+  console.log("Starting workflow...");
+
   const prDetails = await getPRDetails();
   const diff = await getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
+
   if (!diff) {
-    console.log("No diff available.");
+    console.log("No diff found for the PR.");
     return;
   }
+
   const changedFiles = parseDiff(diff);
   const comments = await analyzeCode(changedFiles, prDetails);
 
+  console.log("Comments generated:", comments);
+
+  // Post AI comments if any
   if (comments.length > 0) {
+    console.log("Posting review comments...");
     await octokit.pulls.createReview({
       owner: prDetails.owner,
       repo: prDetails.repo,
@@ -175,13 +218,15 @@ async function main() {
       comments,
       event: "COMMENT",
     });
+    console.log("Review comments posted.");
   }
 
+  // Generate and post PR summary
   const summary = generatePRSummary(prDetails, changedFiles, comments);
   await postPRSummary(prDetails.owner, prDetails.repo, prDetails.pull_number, summary);
 }
 
 main().catch((error) => {
-  console.error("Error:", error);
+  console.error("Workflow failed:", error);
   process.exit(1);
 });
