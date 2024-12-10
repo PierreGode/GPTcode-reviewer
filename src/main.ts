@@ -5,7 +5,7 @@ import { Octokit } from "@octokit/rest";
 import parseDiff, { Chunk, File } from "parse-diff";
 import minimatch from "minimatch";
 
-const G_TOKEN: string = core.getInput("G_TOKEN");
+const GITHUB_TOKEN: string = core.getInput("G_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
 const REVIEW_MAX_COMMENTS: string = core.getInput("REVIEW_MAX_COMMENTS");
@@ -13,7 +13,7 @@ const REVIEW_PROJECT_CONTEXT: string = core.getInput("REVIEW_PROJECT_CONTEXT");
 
 const RESPONSE_TOKENS = 1024;
 
-const octokit = new Octokit({ auth: G_TOKEN });
+const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
 const configuration = new Configuration({
   apiKey: OPENAI_API_KEY,
