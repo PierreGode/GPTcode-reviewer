@@ -111,7 +111,7 @@ ${
 }
 - IMPORTANT: NEVER suggest adding comments to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
-
+- IMPORTANT: Know the difference between added lines + and removed lines -
 Pull request title: ${prDetails.title}
 Pull request description:
 
@@ -125,7 +125,7 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
   const diffChunksPrompt = new Array();
 
   for (const file of changedFiles) {
-    if (file.to === "/dev/null") continue; // Ignore deleted files
+    if (file.to === "/dev/null") continue;
     for (const chunk of file.chunks) {
       diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
     }
