@@ -31760,15 +31760,12 @@ function createPrompt(changedFiles, prDetails) {
 - Provide at most ${REVIEW_MAX_COMMENTS} comments. It's up to you how to decide which comments to include.
 - Write the comment in GitHub Markdown format.
 - Use the given description only for the overall context and only comment the code.
-${REVIEW_PROJECT_CONTEXT
-        ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}`
-        : ""}
+${REVIEW_PROJECT_CONTEXT ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}` : ""}
 - IMPORTANT: NEVER suggest adding comments to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
 
 Pull request title: ${prDetails.title}
 Pull request description:
-
 ---
 ${prDetails.description}
 ---
@@ -31778,7 +31775,7 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
     const diffChunksPrompt = [];
     for (const file of changedFiles) {
         if (file.to === "/dev/null")
-            continue; // Ignore deleted files
+            continue; // Ignorera borttagna filer
         for (const chunk of file.chunks) {
             diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
         }
@@ -31786,24 +31783,25 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
     return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
 }
 function createPromptForDiffChunk(file, chunk) {
-    // Ta med chunk-headern om det finns
+    // Hämta eventuellt header (t.ex. "@@ -1,4 +1,4 @@") om det finns
     const header = chunk.content ? chunk.content.trim() : "";
+    // Använd c.type för att avgöra prefix: "add" = "+", "del" = "-", övrigt = " "
     const changesStr = chunk.changes
         .map((c) => {
-        // Casta till any för att komma åt egenskaperna oldNumber och newNumber
+        // Om TypeScript klagar på egenskapen kan vi casta c till any
         const change = c;
-        const oldNumber = change.oldNumber;
-        const newNumber = change.newNumber;
-        const prefix = (oldNumber === null || oldNumber === undefined) && newNumber !== null && newNumber !== undefined
-            ? "+"
-            : (newNumber === null || newNumber === undefined) && oldNumber !== null && oldNumber !== undefined
-                ? "-"
-                : " ";
-        return `${prefix} ${c.content}`;
+        let prefix = " ";
+        if (change.type === "add") {
+            prefix = "+";
+        }
+        else if (change.type === "del") {
+            prefix = "-";
+        }
+        return `${prefix} ${change.content}`;
     })
         .join("\n");
-    return `\nReview the following code diff in the file "${file.to}". Git diff to review:
-
+    return `\nReview the following code diff in the file "${file.to}":
+  
 \`\`\`diff
 ${header}
 ${changesStr}
@@ -31882,9 +31880,7 @@ function main() {
             const newBaseSha = eventData.before;
             const newHeadSha = eventData.after;
             const response = yield octokit.repos.compareCommits({
-                headers: {
-                    accept: "application/vnd.github.v3.diff",
-                },
+                headers: { accept: "application/vnd.github.v3.diff" },
                 owner: prDetails.owner,
                 repo: prDetails.repo,
                 base: newBaseSha,
