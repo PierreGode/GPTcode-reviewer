@@ -94,7 +94,7 @@ async function analyzeCode(
 
 function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
   const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in following JSON format:  [{"file": <file name>,  "lineNumber":  <line_number>, "reviewComment": "<review comment>"}]
+- Provide the response in following JSON format:  [{"file": <file name>,  "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
 - DO NOT give positive comments or compliments.
 - DO NOT give advice on renaming variable names or writing more descriptive variables.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
@@ -119,27 +119,26 @@ ${prDetails.description}
 TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
 `;
 
-  const diffChunksPrompt = new Array();
+  const diffChunksPrompt: string[] = [];
 
   for (const file of changedFiles) {
-    if (file.to === "/dev/null") continue; // Ignore deleted files
+    if (file.to === "/dev/null") continue; // Ignorera borttagna filer
     for (const chunk of file.chunks) {
       diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
     }
   }
 
-  return `${problemOutline}\n ${diffChunksPrompt.join("\n")}`;
+  return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
 }
 
 function createPromptForDiffChunk(file: File, chunk: Chunk): string {
+  // Inkludera chunk.header (om det finns) för att visa radintervall etc.
+  const header = chunk.content ? chunk.content.trim() : "";
   const changesStr = chunk.changes
     .map((c) => {
-      let prefix = " ";
-      if (c.type === "add") {
-        prefix = "+";
-      } else if (c.type === "del") {
-        prefix = "-";
-      }
+      // Använd c.type för att avgöra prefix
+      const prefix =
+        c.type === "add" ? "+" : c.type === "del" ? "-" : " ";
       return `${prefix} ${c.content}`;
     })
     .join("\n");
@@ -147,6 +146,7 @@ function createPromptForDiffChunk(file: File, chunk: Chunk): string {
   return `\nReview the following code diff in the file "${file.to}". Git diff to review:
 
 \`\`\`diff
+${header}
 ${changesStr}
 \`\`\`
 `;
