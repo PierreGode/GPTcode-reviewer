@@ -1,11 +1,11 @@
 import { readFileSync } from "fs";
 import * as core from "@actions/core";
-import { Configuration, OpenAIApi } from "openai";
+import OpenAI from "openai";
 import { Octokit } from "@octokit/rest";
 import parseDiff, { Chunk, File } from "parse-diff";
-import minimatch from "minimatch";
+import * as minimatch from "minimatch";
 
-const GITHUB_TOKEN: string = core.getInput("G_TOKEN");
+const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
 const REVIEW_MAX_COMMENTS: string = core.getInput("REVIEW_MAX_COMMENTS");
@@ -15,11 +15,9 @@ const RESPONSE_TOKENS = 1024;
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
-
-const openai = new OpenAIApi(configuration);
 
 interface PRDetails {
   owner: string;
@@ -102,7 +100,6 @@ function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
 - Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
 - Provide at most ${REVIEW_MAX_COMMENTS} comments. It's up to you how to decide which comments to include.
 - Write the comment in GitHub Markdown format.
-- Check for math or logic errors in code.
 - Use the given description only for the overall context and only comment the code.
 ${
   REVIEW_PROJECT_CONTEXT
@@ -111,7 +108,7 @@ ${
 }
 - IMPORTANT: NEVER suggest adding comments to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
-- IMPORTANT: Know the difference between added lines + and removed lines -
+
 Pull request title: ${prDetails.title}
 Pull request description:
 
@@ -125,7 +122,7 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
   const diffChunksPrompt = new Array();
 
   for (const file of changedFiles) {
-    if (file.to === "/dev/null") continue;
+    if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
       diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
     }
@@ -135,17 +132,24 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
 }
 
 function createPromptForDiffChunk(file: File, chunk: Chunk): string {
-  return `\n
-  Review the following code diff in the file "${file.to}". Git diff to review:
+  const changesStr = chunk.changes
+    .map((c) => {
+      let prefix = " ";
+      if (c.type === "add") {
+        prefix = "+";
+      } else if (c.type === "del") {
+        prefix = "-";
+      }
+      return `${prefix} ${c.content}`;
+    })
+    .join("\n");
 
-  \`\`\`diff
-  ${chunk.content}
-  ${chunk.changes
-    // @ts-expect-error - ln and ln2 exists where needed
-    .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-    .join("\n")}
-  \`\`\`
-  `;
+  return `\nReview the following code diff in the file "${file.to}". Git diff to review:
+
+\`\`\`diff
+${changesStr}
+\`\`\`
+`;
 }
 
 async function getAIResponse(
@@ -161,7 +165,7 @@ async function getAIResponse(
   };
 
   try {
-    const response = await openai.createChatCompletion({
+    const response = await openai.chat.completions.create({
       ...queryConfig,
       messages: [
         {
@@ -171,7 +175,8 @@ async function getAIResponse(
       ],
     });
 
-    const res = response.data.choices[0].message?.content?.trim() || "[]";
+    const res =
+      response.choices[0].message?.content?.trim() || "[]";
     return JSON.parse(res);
   } catch (error: any) {
     console.error("Error Message:", error?.message || error);
@@ -269,7 +274,7 @@ async function main() {
 
   const filteredDiff = changedFiles.filter((file) => {
     return !excludePatterns.some((pattern) =>
-      minimatch(file.to ?? "", pattern)
+      minimatch.minimatch(file.to ?? "", pattern)
     );
   });
 
