@@ -132,14 +132,20 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
 }
 
 function createPromptForDiffChunk(file: File, chunk: Chunk): string {
-  // Inkludera chunk.header (om det finns) för att visa radintervall etc.
+  // Inkludera headern (om den finns) för att ge kontext, t.ex. radintervall
   const header = chunk.content ? chunk.content.trim() : "";
+
+  // Använd ln och ln2 via cast till any
   const changesStr = chunk.changes
     .map((c) => {
-      // Använd c.type för att avgöra prefix
-      const prefix =
-        c.type === "add" ? "+" : c.type === "del" ? "-" : " ";
-      return `${prefix} ${c.content}`;
+      const change: any = c;
+      let prefix = " ";
+      if (change.ln === null && change.ln2 !== null) {
+        prefix = "+";
+      } else if (change.ln !== null && change.ln2 === null) {
+        prefix = "-";
+      }
+      return `${prefix} ${change.content}`;
     })
     .join("\n");
 
@@ -190,7 +196,6 @@ async function getAIResponse(
     if (error?.config) {
       console.error("Config:", error.config);
     }
-
     return null;
   }
 }
@@ -202,14 +207,13 @@ function createComments(
   return aiResponses
     .flatMap((aiResponse) => {
       const file = changedFiles.find((file) => file.to === aiResponse.file);
-
       return {
         body: aiResponse.reviewComment,
         path: file?.to ?? "",
         line: Number(aiResponse.lineNumber),
       };
     })
-    .filter((comments) => comments.path !== "");
+    .filter((comment) => comment.path !== "");
 }
 
 async function createReviewComment(

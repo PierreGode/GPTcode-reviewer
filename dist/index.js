@@ -31786,13 +31786,20 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
     return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
 }
 function createPromptForDiffChunk(file, chunk) {
-    // Inkludera chunk.header (om det finns) för att visa radintervall etc.
+    // Inkludera headern (om den finns) för att ge kontext, t.ex. radintervall
     const header = chunk.content ? chunk.content.trim() : "";
+    // Använd ln och ln2 via cast till any
     const changesStr = chunk.changes
         .map((c) => {
-        // Använd c.type för att avgöra prefix
-        const prefix = c.type === "add" ? "+" : c.type === "del" ? "-" : " ";
-        return `${prefix} ${c.content}`;
+        const change = c;
+        let prefix = " ";
+        if (change.ln === null && change.ln2 !== null) {
+            prefix = "+";
+        }
+        else if (change.ln !== null && change.ln2 === null) {
+            prefix = "-";
+        }
+        return `${prefix} ${change.content}`;
     })
         .join("\n");
     return `\nReview the following code diff in the file "${file.to}". Git diff to review:
@@ -31849,7 +31856,7 @@ function createComments(changedFiles, aiResponses) {
             line: Number(aiResponse.lineNumber),
         };
     })
-        .filter((comments) => comments.path !== "");
+        .filter((comment) => comment.path !== "");
 }
 function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
