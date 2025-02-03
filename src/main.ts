@@ -114,7 +114,7 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
 
   const diffChunksPrompt: string[] = [];
   for (const file of changedFiles) {
-    if (file.to === "/dev/null") continue; // Ignorera borttagna filer
+    if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
       diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
     }
@@ -123,18 +123,19 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
 }
 
 function createPromptForDiffChunk(file: File, chunk: Chunk): string {
-  // Hämta eventuellt header (t.ex. "@@ -1,4 +1,4 @@") om det finns
+  // Inkludera chunk-headern (t.ex. "@@ -1,4 +1,4 @@") om det finns
   const header = chunk.content ? chunk.content.trim() : "";
-  // Använd c.type för att avgöra prefix: "add" = "+", "del" = "-", övrigt = " "
+  // Filtrera bort borttagna rader och visa endast tillagda/ändrade rader
   const changesStr = chunk.changes
+    .filter((c) => {
+      const change = c as any;
+      return change.type !== "del";
+    })
     .map((c) => {
-      // Om TypeScript klagar på egenskapen kan vi casta c till any
       const change = c as any;
       let prefix = " ";
       if (change.type === "add") {
         prefix = "+";
-      } else if (change.type === "del") {
-        prefix = "-";
       }
       return `${prefix} ${change.content}`;
     })
