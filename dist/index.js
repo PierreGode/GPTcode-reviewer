@@ -31753,7 +31753,7 @@ function analyzeCode(changedFiles, prDetails) {
 }
 function createPrompt(changedFiles, prDetails) {
     const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in following JSON format: [{"file": <file name>, "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
+- Provide the response in following JSON format:  [{"file": <file name>,  "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
 - DO NOT give positive comments or compliments.
 - DO NOT give advice on renaming variable names or writing more descriptive variables.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
@@ -31780,31 +31780,25 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
         if (file.to === "/dev/null")
             continue; // Ignorera borttagna filer
         for (const chunk of file.chunks) {
-            // Vi skickar endast med chunkar som innehåller tillagda rader.
-            const promptForChunk = createPromptForDiffChunk(file, chunk);
-            if (promptForChunk) {
-                diffChunksPrompt.push(promptForChunk);
-            }
+            diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
         }
     }
     return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
 }
-/**
- * Returnerar en prompt-sträng för en diff-chunk om den innehåller tillagda rader.
- * Om inga tillagda rader finns (dvs. endast korrigerade/borttagna rader) returneras en tom sträng.
- */
 function createPromptForDiffChunk(file, chunk) {
-    // Filtrera ut endast de ändringar som är "add"
-    const addedChanges = chunk.changes.filter((change) => change.type === "add");
-    if (addedChanges.length === 0) {
-        return "";
-    }
-    const changesStr = addedChanges
-        .map((change) => `+ ${change.content}`)
+    // Inkludera chunk.header (om det finns) för att visa radintervall etc.
+    const header = chunk.content ? chunk.content.trim() : "";
+    const changesStr = chunk.changes
+        .map((c) => {
+        // Använd c.type för att avgöra prefix
+        const prefix = c.type === "add" ? "+" : c.type === "del" ? "-" : " ";
+        return `${prefix} ${c.content}`;
+    })
         .join("\n");
     return `\nReview the following code diff in the file "${file.to}". Git diff to review:
 
 \`\`\`diff
+${header}
 ${changesStr}
 \`\`\`
 `;
@@ -31844,43 +31838,18 @@ function getAIResponse(prompt) {
         }
     });
 }
-/**
- * För varje AI-svar letar vi upp den chunk där den tillagda raden (matchande lineNumber)
- * finns. Vi använder chunkens header (om den finns) som diff_hunk.
- */
 function createComments(changedFiles, aiResponses) {
-    const comments = [];
-    for (const aiResponse of aiResponses) {
-        const file = changedFiles.find((f) => f.to === aiResponse.file);
-        if (!file)
-            continue;
-        // Försök hitta en chunk där någon av de tillagda raderna har lineNumber = aiResponse.lineNumber
-        let diffHunk = "";
-        for (const chunk of file.chunks) {
-            const addedChanges = chunk.changes.filter((change) => change.type === "add");
-            for (const change of addedChanges) {
-                // Vi castar till any då typerna inte är helt tydliga
-                const c = change;
-                if (String(c.ln2) === aiResponse.lineNumber) {
-                    diffHunk = chunk.content ? chunk.content.trim() : "";
-                    break;
-                }
-            }
-            if (diffHunk)
-                break;
-        }
-        if (!diffHunk) {
-            // Om ingen chunk hittas, hoppa över kommentaren
-            continue;
-        }
-        comments.push({
+    return aiResponses
+        .flatMap((aiResponse) => {
+        var _a;
+        const file = changedFiles.find((file) => file.to === aiResponse.file);
+        return {
             body: aiResponse.reviewComment,
-            path: file.to || "",
+            path: (_a = file === null || file === void 0 ? void 0 : file.to) !== null && _a !== void 0 ? _a : "",
             line: Number(aiResponse.lineNumber),
-            diff_hunk: diffHunk,
-        });
-    }
-    return comments;
+        };
+    })
+        .filter((comments) => comments.path !== "");
 }
 function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
