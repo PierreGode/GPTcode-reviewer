@@ -31780,7 +31780,7 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
         if (file.to === "/dev/null")
             continue; // Ignorera borttagna filer
         for (const chunk of file.chunks) {
-            // Anropa funktionen som endast returnerar tillagda rader.
+            // Vi skickar endast med chunkar som innehåller tillagda rader.
             const promptForChunk = createPromptForDiffChunk(file, chunk);
             if (promptForChunk) {
                 diffChunksPrompt.push(promptForChunk);
@@ -31794,9 +31794,9 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
  * Om inga tillagda rader finns (dvs. endast korrigerade/borttagna rader) returneras en tom sträng.
  */
 function createPromptForDiffChunk(file, chunk) {
+    // Filtrera ut endast de ändringar som är "add"
     const addedChanges = chunk.changes.filter((change) => change.type === "add");
     if (addedChanges.length === 0) {
-        // Inga nya rader att granska – förmodligen korrigerade misstag
         return "";
     }
     const changesStr = addedChanges
@@ -31844,18 +31844,43 @@ function getAIResponse(prompt) {
         }
     });
 }
+/**
+ * För varje AI-svar letar vi upp den chunk där den tillagda raden (matchande lineNumber)
+ * finns. Vi använder chunkens header (om den finns) som diff_hunk.
+ */
 function createComments(changedFiles, aiResponses) {
-    return aiResponses
-        .flatMap((aiResponse) => {
-        var _a;
-        const file = changedFiles.find((file) => file.to === aiResponse.file);
-        return {
+    const comments = [];
+    for (const aiResponse of aiResponses) {
+        const file = changedFiles.find((f) => f.to === aiResponse.file);
+        if (!file)
+            continue;
+        // Försök hitta en chunk där någon av de tillagda raderna har lineNumber = aiResponse.lineNumber
+        let diffHunk = "";
+        for (const chunk of file.chunks) {
+            const addedChanges = chunk.changes.filter((change) => change.type === "add");
+            for (const change of addedChanges) {
+                // Vi castar till any då typerna inte är helt tydliga
+                const c = change;
+                if (String(c.ln2) === aiResponse.lineNumber) {
+                    diffHunk = chunk.content ? chunk.content.trim() : "";
+                    break;
+                }
+            }
+            if (diffHunk)
+                break;
+        }
+        if (!diffHunk) {
+            // Om ingen chunk hittas, hoppa över kommentaren
+            continue;
+        }
+        comments.push({
             body: aiResponse.reviewComment,
-            path: (_a = file === null || file === void 0 ? void 0 : file.to) !== null && _a !== void 0 ? _a : "",
+            path: file.to || "",
             line: Number(aiResponse.lineNumber),
-        };
-    })
-        .filter((comment) => comment.path !== "");
+            diff_hunk: diffHunk,
+        });
+    }
+    return comments;
 }
 function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
