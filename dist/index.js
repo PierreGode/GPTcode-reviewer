@@ -31753,22 +31753,19 @@ function analyzeCode(changedFiles, prDetails) {
 }
 function createPrompt(changedFiles, prDetails) {
     const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in following JSON format:  [{"file": <file name>,  "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
+- Provide the response in following JSON format: [{"file": <file name>, "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
 - DO NOT give positive comments or compliments.
 - DO NOT give advice on renaming variable names or writing more descriptive variables.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
 - Provide at most ${REVIEW_MAX_COMMENTS} comments. It's up to you how to decide which comments to include.
 - Write the comment in GitHub Markdown format.
 - Use the given description only for the overall context and only comment the code.
-${REVIEW_PROJECT_CONTEXT
-        ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}`
-        : ""}
+${REVIEW_PROJECT_CONTEXT ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}` : ""}
 - IMPORTANT: NEVER suggest adding comments to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
 
 Pull request title: ${prDetails.title}
 Pull request description:
-
 ---
 ${prDetails.description}
 ---
@@ -31778,7 +31775,7 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
     const diffChunksPrompt = [];
     for (const file of changedFiles) {
         if (file.to === "/dev/null")
-            continue; // Ignorera borttagna filer
+            continue; // Ignore deleted files
         for (const chunk of file.chunks) {
             diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
         }
@@ -31786,17 +31783,25 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
     return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
 }
 function createPromptForDiffChunk(file, chunk) {
-    // Inkludera chunk.header (om det finns) för att visa radintervall etc.
+    // Inkludera chunk-headern (t.ex. "@@ -1,4 +1,4 @@") om det finns
     const header = chunk.content ? chunk.content.trim() : "";
+    // Filtrera bort borttagna rader och visa endast tillagda/ändrade rader
     const changesStr = chunk.changes
+        .filter((c) => {
+        const change = c;
+        return change.type !== "del";
+    })
         .map((c) => {
-        // Använd c.type för att avgöra prefix
-        const prefix = c.type === "add" ? "+" : c.type === "del" ? "-" : " ";
-        return `${prefix} ${c.content}`;
+        const change = c;
+        let prefix = " ";
+        if (change.type === "add") {
+            prefix = "+";
+        }
+        return `${prefix} ${change.content}`;
     })
         .join("\n");
-    return `\nReview the following code diff in the file "${file.to}". Git diff to review:
-
+    return `\nReview the following code diff in the file "${file.to}":
+  
 \`\`\`diff
 ${header}
 ${changesStr}
@@ -31849,7 +31854,7 @@ function createComments(changedFiles, aiResponses) {
             line: Number(aiResponse.lineNumber),
         };
     })
-        .filter((comments) => comments.path !== "");
+        .filter((comment) => comment.path !== "");
 }
 function createReviewComment(owner, repo, pull_number, comments) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -31875,9 +31880,7 @@ function main() {
             const newBaseSha = eventData.before;
             const newHeadSha = eventData.after;
             const response = yield octokit.repos.compareCommits({
-                headers: {
-                    accept: "application/vnd.github.v3.diff",
-                },
+                headers: { accept: "application/vnd.github.v3.diff" },
                 owner: prDetails.owner,
                 repo: prDetails.repo,
                 base: newBaseSha,

@@ -83,35 +83,28 @@ async function analyzeCode(
 
   if (aiResponse) {
     const newComments = createComments(changedFiles, aiResponse);
-
     if (newComments) {
       comments.push(...newComments);
     }
   }
-
   return comments;
 }
 
 function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
   const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in following JSON format:  [{"file": <file name>,  "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
+- Provide the response in following JSON format: [{"file": <file name>, "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
 - DO NOT give positive comments or compliments.
 - DO NOT give advice on renaming variable names or writing more descriptive variables.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
 - Provide at most ${REVIEW_MAX_COMMENTS} comments. It's up to you how to decide which comments to include.
 - Write the comment in GitHub Markdown format.
 - Use the given description only for the overall context and only comment the code.
-${
-  REVIEW_PROJECT_CONTEXT
-    ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}`
-    : ""
-}
+${REVIEW_PROJECT_CONTEXT ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}` : ""}
 - IMPORTANT: NEVER suggest adding comments to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
 
 Pull request title: ${prDetails.title}
 Pull request description:
-
 ---
 ${prDetails.description}
 ---
@@ -120,31 +113,36 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
 `;
 
   const diffChunksPrompt: string[] = [];
-
   for (const file of changedFiles) {
-    if (file.to === "/dev/null") continue; // Ignorera borttagna filer
+    if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
       diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
     }
   }
-
   return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
 }
 
 function createPromptForDiffChunk(file: File, chunk: Chunk): string {
-  // Inkludera chunk.header (om det finns) för att visa radintervall etc.
+  // Inkludera chunk-headern (t.ex. "@@ -1,4 +1,4 @@") om det finns
   const header = chunk.content ? chunk.content.trim() : "";
+  // Filtrera bort borttagna rader och visa endast tillagda/ändrade rader
   const changesStr = chunk.changes
+    .filter((c) => {
+      const change = c as any;
+      return change.type !== "del";
+    })
     .map((c) => {
-      // Använd c.type för att avgöra prefix
-      const prefix =
-        c.type === "add" ? "+" : c.type === "del" ? "-" : " ";
-      return `${prefix} ${c.content}`;
+      const change = c as any;
+      let prefix = " ";
+      if (change.type === "add") {
+        prefix = "+";
+      }
+      return `${prefix} ${change.content}`;
     })
     .join("\n");
 
-  return `\nReview the following code diff in the file "${file.to}". Git diff to review:
-
+  return `\nReview the following code diff in the file "${file.to}":
+  
 \`\`\`diff
 ${header}
 ${changesStr}
@@ -175,22 +173,18 @@ async function getAIResponse(
       ],
     });
 
-    const res =
-      response.choices[0].message?.content?.trim() || "[]";
+    const res = response.choices[0].message?.content?.trim() || "[]";
     return JSON.parse(res);
   } catch (error: any) {
     console.error("Error Message:", error?.message || error);
-
     if (error?.response) {
       console.error("Response Data:", error.response.data);
       console.error("Response Status:", error.response.status);
       console.error("Response Headers:", error.response.headers);
     }
-
     if (error?.config) {
       console.error("Config:", error.config);
     }
-
     return null;
   }
 }
@@ -202,14 +196,13 @@ function createComments(
   return aiResponses
     .flatMap((aiResponse) => {
       const file = changedFiles.find((file) => file.to === aiResponse.file);
-
       return {
         body: aiResponse.reviewComment,
         path: file?.to ?? "",
         line: Number(aiResponse.lineNumber),
       };
     })
-    .filter((comments) => comments.path !== "");
+    .filter((comment) => comment.path !== "");
 }
 
 async function createReviewComment(
@@ -235,25 +228,17 @@ async function main() {
   );
 
   if (eventData.action === "opened") {
-    diff = await getDiff(
-      prDetails.owner,
-      prDetails.repo,
-      prDetails.pull_number
-    );
+    diff = await getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
   } else if (eventData.action === "synchronize") {
     const newBaseSha = eventData.before;
     const newHeadSha = eventData.after;
-
     const response = await octokit.repos.compareCommits({
-      headers: {
-        accept: "application/vnd.github.v3.diff",
-      },
+      headers: { accept: "application/vnd.github.v3.diff" },
       owner: prDetails.owner,
       repo: prDetails.repo,
       base: newBaseSha,
       head: newHeadSha,
     });
-
     diff = String(response.data);
   } else {
     console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
@@ -280,12 +265,7 @@ async function main() {
 
   const comments = await analyzeCode(filteredDiff, prDetails);
   if (comments.length > 0) {
-    await createReviewComment(
-      prDetails.owner,
-      prDetails.repo,
-      prDetails.pull_number,
-      comments
-    );
+    await createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
   }
 }
 
