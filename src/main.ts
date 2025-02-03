@@ -83,18 +83,16 @@ async function analyzeCode(
 
   if (aiResponse) {
     const newComments = createComments(changedFiles, aiResponse);
-
     if (newComments) {
       comments.push(...newComments);
     }
   }
-
   return comments;
 }
 
 function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
   const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in following JSON format:  [{"file": <file name>,  "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
+- Provide the response in following JSON format: [{"file": <file name>, "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
 - DO NOT give positive comments or compliments.
 - DO NOT give advice on renaming variable names or writing more descriptive variables.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
@@ -124,35 +122,35 @@ TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
   for (const file of changedFiles) {
     if (file.to === "/dev/null") continue; // Ignorera borttagna filer
     for (const chunk of file.chunks) {
-      diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
+      // Anropa funktionen som endast returnerar tillagda rader.
+      const promptForChunk = createPromptForDiffChunk(file, chunk);
+      if (promptForChunk) {
+        diffChunksPrompt.push(promptForChunk);
+      }
     }
   }
 
   return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
 }
 
+/**
+ * Returnerar en prompt-sträng för en diff-chunk om den innehåller tillagda rader.
+ * Om inga tillagda rader finns (dvs. endast korrigerade/borttagna rader) returneras en tom sträng.
+ */
 function createPromptForDiffChunk(file: File, chunk: Chunk): string {
-  // Inkludera headern (om den finns) för att ge kontext, t.ex. radintervall
-  const header = chunk.content ? chunk.content.trim() : "";
+  const addedChanges = chunk.changes.filter((change) => change.type === "add");
+  if (addedChanges.length === 0) {
+    // Inga nya rader att granska – förmodligen korrigerade misstag
+    return "";
+  }
 
-  // Använd ln och ln2 via cast till any
-  const changesStr = chunk.changes
-    .map((c) => {
-      const change: any = c;
-      let prefix = " ";
-      if (change.ln === null && change.ln2 !== null) {
-        prefix = "+";
-      } else if (change.ln !== null && change.ln2 === null) {
-        prefix = "-";
-      }
-      return `${prefix} ${change.content}`;
-    })
+  const changesStr = addedChanges
+    .map((change) => `+ ${change.content}`)
     .join("\n");
 
   return `\nReview the following code diff in the file "${file.to}". Git diff to review:
 
 \`\`\`diff
-${header}
 ${changesStr}
 \`\`\`
 `;
