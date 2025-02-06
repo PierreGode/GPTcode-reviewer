@@ -102,6 +102,7 @@ function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
 ${REVIEW_PROJECT_CONTEXT ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}` : ""}
 - IMPORTANT: NEVER suggest adding comments to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
+- IMPORTANT: do not comment on + the + is just an indicaror od added line, ignore + at the beginning of line.
 
 Pull request title: ${prDetails.title}
 Pull request description:
