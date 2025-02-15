@@ -142,7 +142,7 @@ function createPromptForDiffChunk(file: File, chunk: Chunk): string {
     })
     .join("\n");
 
-  return `\nReview the following code diff in the file "${file.to}":
+  return `\nReview the following code diff in the file but ignore + at the beginning of line as it just poins out that this is an added line and not deleted."${file.to}":
   
 \`\`\`diff
 ${header}
