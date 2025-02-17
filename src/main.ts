@@ -101,6 +101,7 @@ function createPrompt(changedFiles: File[], prDetails: PRDetails): string {
 - Use the given description only for the overall context and only comment the code.
 ${REVIEW_PROJECT_CONTEXT ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}` : ""}
 - IMPORTANT: NEVER suggest adding comments to the code.
+- IMPORTANT: NEVER comment on comment rows unless the pose any issues to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
 - IMPORTANT: do not comment on + the + is just an indicaror od added line, ignore + at the beginning of line.
 
