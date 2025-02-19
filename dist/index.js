@@ -31753,18 +31753,18 @@ function analyzeCode(changedFiles, prDetails) {
 }
 function createPrompt(changedFiles, prDetails) {
     const problemOutline = `Your task is to review pull requests (PR). Instructions:
-- Provide the response in following JSON format: [{"file": <file name>, "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
+- Provide the response in the following JSON format: [{"file": <file name>, "lineNumber": <line_number>, "reviewComment": "<review comment>"}]
 - DO NOT give positive comments or compliments.
 - DO NOT give advice on renaming variable names or writing more descriptive variables.
-- Provide comments and suggestions ONLY if there is something to improve, otherwise return an empty array.
+- Provide comments and suggestions ONLY if there is something to improve in the diff, otherwise return an empty array.
 - Provide at most ${REVIEW_MAX_COMMENTS} comments. It's up to you how to decide which comments to include.
 - Write the comment in GitHub Markdown format.
-- Use the given description only for the overall context and only comment the code.
+- Use the given description only for the overall context and only comment on the code changes.
 ${REVIEW_PROJECT_CONTEXT ? `- Additional context regarding this PR's project: ${REVIEW_PROJECT_CONTEXT}` : ""}
 - IMPORTANT: NEVER suggest adding comments to the code.
-- IMPORTANT: NEVER comment on comment rows unless the pose any issues to the code.
+- IMPORTANT: NEVER comment on comment rows unless they pose any issues to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
-- IMPORTANT: do not comment on + the + is just an indicaror od added line, ignore + at the beginning of line.
+- IMPORTANT: The following full file contexts are provided solely to give you a complete understanding of the codebase. You MUST ONLY comment on the changed rows indicated in the diff and ignore the rest of the file content.
 
 Pull request title: ${prDetails.title}
 Pull request description:
@@ -31772,22 +31772,34 @@ Pull request description:
 ${prDetails.description}
 ---
 
-TAKE A DEEP BREATH AND WORK ON THIS THIS PROBLEM STEP-BY-STEP.
+TAKE A DEEP BREATH AND WORK ON THIS PROBLEM STEP-BY-STEP.
 `;
     const diffChunksPrompt = [];
     for (const file of changedFiles) {
-        if (file.to === "/dev/null")
-            continue; // Ignore deleted files
+        if (!file.to || file.to === "/dev/null")
+            continue; // Ignore deleted or undefined files
         for (const chunk of file.chunks) {
             diffChunksPrompt.push(createPromptForDiffChunk(file, chunk));
         }
     }
-    return `${problemOutline}\n${diffChunksPrompt.join("\n")}`;
+    const fileContextsPrompt = [];
+    for (const file of changedFiles) {
+        if (!file.to || file.to === "/dev/null")
+            continue; // Ignore deleted or undefined files
+        try {
+            const fileContent = (0, fs_1.readFileSync)(file.to, "utf8");
+            fileContextsPrompt.push(`\nFull file context for "${file.to}":\n\`\`\`plaintext\n${fileContent}\n\`\`\``);
+        }
+        catch (error) {
+            console.error(`Failed to read file ${file.to}:`, error);
+        }
+    }
+    return `${problemOutline}\n${diffChunksPrompt.join("\n")}\n${fileContextsPrompt.join("\n")}`;
 }
 function createPromptForDiffChunk(file, chunk) {
-    // Inkludera chunk-headern (t.ex. "@@ -1,4 +1,4 @@") om det finns
+    // Include the chunk header (e.g. "@@ -1,4 +1,4 @@") if present
     const header = chunk.content ? chunk.content.trim() : "";
-    // Filtrera bort borttagna rader och visa endast tillagda/ändrade rader
+    // Filter out deleted rows and only show added/changed rows
     const changesStr = chunk.changes
         .filter((c) => {
         const change = c;
@@ -31802,7 +31814,7 @@ function createPromptForDiffChunk(file, chunk) {
         return `${prefix} ${change.content}`;
     })
         .join("\n");
-    return `\nReview the following code diff in the file but ignore + at the beginning of line as it just poins out that this is an added line and not deleted."${file.to}":
+    return `\nReview the following code diff in the file but ignore + at the beginning of line as it just points out that this is an added line and not deleted. "${file.to}":
   
 \`\`\`diff
 ${header}
