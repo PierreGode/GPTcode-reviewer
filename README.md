@@ -37,32 +37,7 @@ review process.
 
 3. Create a `.github/workflows/main.yml` file in your repository and add the following content:
 
-```yaml
-name: GPTcode-reviewer
-
-on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-permissions: write-all
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: GPTcode-reviewer
-        uses: your-username/GPTcode-reviewer@main
-        with:
-          GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_MODEL: "gpt-4o-mini" # Optional: defaults to "gpt-4o-mini"
-          REVIEW_MAX_COMMENTS: 5 # Optional: defaults to 10
-          REVIEW_PROJECT_CONTEXT: "PHP 8.3 + Laravel 10 + PHPUnit 7." # Optional
-          exclude: "**/*.json, **/*.md" # Optional: exclude patterns separated by commas
-```
+#### See INSTALL.md
 
 4. Replace `your-username` with your GitHub username or organization name where the AI Code Reviewer repository is
    located.
