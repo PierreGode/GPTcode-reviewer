@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Build and Deploy to Build Branch
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20  # Updated to fix minimatch@10.0.1 issue
           cache: 'yarn'
 
       - name: Install Dependencies
@@ -30,10 +30,18 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          git fetch --depth=1 origin build || git checkout --orphan build
+          git fetch origin build || git checkout --orphan build
+          git checkout build || git checkout --orphan build
+          
           git reset --hard
           git clean -fd
-          
+
+          # Ensure dist/ has actual changes before committing
+          if git diff --quiet origin/build -- dist/; then
+            echo "No changes in dist/. Skipping deployment."
+            exit 0
+          fi
+
           git add -f dist
           git commit -m "Deploy built files from GitHub Actions"
 
