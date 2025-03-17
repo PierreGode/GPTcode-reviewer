@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Build and Deploy to Build Branch
 
 on:
   push:
@@ -16,16 +16,30 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: 'yarn'
 
+      - name: Check if /src has changed
+        id: check_changes
+        run: |
+          if git diff --quiet HEAD^ HEAD -- src/; then
+            echo "No changes in /src. Skipping build."
+            echo "skip_build=true" >> $GITHUB_ENV
+          else
+            echo "Changes detected in /src. Proceeding with build."
+            echo "skip_build=false" >> $GITHUB_ENV
+          fi
+
       - name: Install Dependencies
+        if: env.skip_build == 'false'
         run: yarn install --frozen-lockfile
 
       - name: Build with ncc
+        if: env.skip_build == 'false'
         run: npx ncc build src/main.ts -o dist
 
       - name: Deploy to build branch
+        if: env.skip_build == 'false'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -33,7 +47,7 @@ jobs:
           git fetch --depth=1 origin build || git checkout --orphan build
           git reset --hard
           git clean -fd
-          
+
           git add -f dist
           git commit -m "Deploy built files from GitHub Actions"
 
