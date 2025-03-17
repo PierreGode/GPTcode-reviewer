@@ -104,7 +104,7 @@ ${REVIEW_PROJECT_CONTEXT ? `- Additional context regarding this PR's project: ${
 - IMPORTANT: NEVER comment on comment rows unless they pose any issues to the code.
 - IMPORTANT: Evaluate the entire diff in the PR before adding any comments.
 - IMPORTANT: The following full file contexts are provided solely to give you a complete understanding of the codebase. You MUST ONLY comment on the changed rows indicated in the diff and ignore the rest of the file content.
-
+- IMPORTANT: Review the following code diff in the file but ignore + at the beginning of line as it just points out that this is an added line and not deleted.
 Pull request title: ${prDetails.title}
 Pull request description:
 ---
