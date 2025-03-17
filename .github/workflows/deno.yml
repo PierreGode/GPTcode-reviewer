@@ -1,0 +1,43 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'yarn'
+
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build with ncc
+        run: npx ncc build src/main.ts -o dist
+
+      - name: Deploy to build branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch --depth=1 origin build || git checkout --orphan build
+          git reset --hard
+          git clean -fd
+          
+          git add -f dist
+          git commit -m "Deploy built files from GitHub Actions"
+
+          git push --force https://x-access-token:${{ secrets.G_TOKEN }}@github.com/${{ github.repository }}.git HEAD:build
